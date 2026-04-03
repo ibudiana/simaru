@@ -34,3 +34,23 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## ENV Environment:
+
+```bash
+# Environment variables declared in this file are NOT automatically loaded by Prisma.
+# Please add `import "dotenv/config";` to your `prisma.config.ts` file, or use the Prisma CLI with Bun
+# to load environment variables from .env files: https://pris.ly/prisma-config-env-vars.
+# Prisma supports the native connection string format for PostgreSQL, MySQL, SQLite, SQL Server, MongoDB and CockroachDB.
+# See the documentation for all the connection string options: https://pris.ly/d/connection-strings
+
+DATABASE_URL="postgresql://username:password@localhost:5432/dbname?schema=public"
+
+# SMTP Configuration (Google SMTP)
+# Untuk Gmail, buat App Password di akun Google Anda (2FA aktif)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=user@gmail.com
+SMTP_PASSWORD=
+SMTP_FROM="SIMARU <user@gmail.com>"
+```
