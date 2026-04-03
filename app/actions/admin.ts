@@ -277,7 +277,7 @@ export async function getReportData(filter: {
     orderBy: { schedule: { startTime: "desc" } },
   });
 
-  return reservations.map((r) => ({
+  return reservations.map((r: (typeof reservations)[number]) => ({
     "ID Reservasi": r.id,
     "Nama Pemohon": r.user.name,
     Email: r.user.email,
