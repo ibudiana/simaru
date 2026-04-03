@@ -47,7 +47,7 @@ export async function processAdminApproval(formData: FormData) {
 
   // Update the stage belonging to this Admin
   const adminStage = reservation.approvalStages.find(
-    (s: typeof reservation.approvalStages[number]) =>
+    (s: (typeof reservation.approvalStages)[number]) =>
       s.approverId === session.userId &&
       s.status === RESERVATION_STATUS.PENDING,
   );
