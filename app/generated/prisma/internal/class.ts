@@ -23,7 +23,7 @@ const config: runtime.GetPrismaClientConfig = {
       "value": "prisma-client"
     },
     "output": {
-      "value": "/Users/ian/project/learning/webpage/simaru-next-js/app/generated/prisma",
+      "value": "/Users/ian/project/learning/webpage/simaru/app/generated/prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -37,7 +37,7 @@ const config: runtime.GetPrismaClientConfig = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/ian/project/learning/webpage/simaru-next-js/prisma/schema.prisma",
+    "sourceFilePath": "/Users/ian/project/learning/webpage/simaru/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativePath": "../../../prisma",
