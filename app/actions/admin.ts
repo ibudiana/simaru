@@ -1,7 +1,6 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { ReservationStatus, StageStatus } from '@prisma/client'
 import { verifySession } from '@/lib/session'
 import { revalidatePath } from 'next/cache'
 import { 
@@ -15,6 +14,16 @@ import {
   endOfYear,
   parseISO
 } from 'date-fns'
+
+const RESERVATION_STATUS = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const
+
+const STAGE_STATUS = {
+  APPROVED: 'APPROVED',
+} as const
 
 export async function processAdminApproval(formData: FormData) {
   const session = await verifySession()
@@ -38,7 +47,7 @@ export async function processAdminApproval(formData: FormData) {
 
   // Update the stage belonging to this Admin
   const adminStage = reservation.approvalStages.find(
-    s => s.approverId === session.userId && s.status === ReservationStatus.PENDING
+    s => s.approverId === session.userId && s.status === RESERVATION_STATUS.PENDING
   )
 
   if (!adminStage) throw new Error('Tidak ada tugas persetujuan untuk Anda')
@@ -47,11 +56,11 @@ export async function processAdminApproval(formData: FormData) {
     await prisma.$transaction([
       prisma.approvalWorkflow.update({
         where: { id: adminStage.id },
-        data: { status: ReservationStatus.REJECTED, notes, approvedAt: new Date() }
+        data: { status: RESERVATION_STATUS.REJECTED, notes, approvedAt: new Date() }
       }),
       prisma.reservation.update({
         where: { id: reservationId },
-        data: { status: ReservationStatus.REJECTED }
+        data: { status: RESERVATION_STATUS.REJECTED }
       }),
       prisma.notification.create({
         data: {
@@ -64,6 +73,7 @@ export async function processAdminApproval(formData: FormData) {
   } else if (action === 'APPROVE') {
     // Admin approves -> forward to the specific room approver (Kaprodi)
     const targetApproverId = reservation.room.approverId
+    let finalApproverId: number
     
     if (!targetApproverId) {
       // Fallback to first approver if none specifically assigned (though it should be assigned)
@@ -71,23 +81,23 @@ export async function processAdminApproval(formData: FormData) {
       if (approvers.length === 0) {
         throw new Error('Tidak ada Kaprodi di dalam sistem.')
       }
-      var finalApproverId = approvers[0].id
+      finalApproverId = approvers[0].id
     } else {
-      var finalApproverId = targetApproverId
+      finalApproverId = targetApproverId
     }
 
     await prisma.$transaction([
       prisma.approvalWorkflow.update({
         where: { id: adminStage.id },
-        data: { status: ReservationStatus.APPROVED, notes, approvedAt: new Date() }
+        data: { status: RESERVATION_STATUS.APPROVED, notes, approvedAt: new Date() }
       }),
       // Create next stage
       prisma.approvalWorkflow.create({
         data: {
           reservationId,
-          stage: StageStatus.APPROVED, // next stage after REQUESTED
+          stage: STAGE_STATUS.APPROVED, // next stage after REQUESTED
           approverId: finalApproverId,
-          status: ReservationStatus.PENDING,
+          status: RESERVATION_STATUS.PENDING,
           notes: 'Menunggu persetujuan final dari Kaprodi / Pimpinan',
         }
       }),
