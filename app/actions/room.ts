@@ -1,22 +1,27 @@
-'use server'
+"use server";
 
-import prisma from '@/lib/prisma'
-import { verifySession } from '@/lib/session'
-import { revalidatePath } from 'next/cache'
+import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { verifySession } from "@/lib/session";
+import { revalidatePath } from "next/cache";
 
 export async function createRoom(formData: FormData) {
-  const session = await verifySession()
-  if (!session || session.role !== 'AGGREGATOR') {
-    throw new Error('Akses ditolak')
+  const session = await verifySession();
+  if (!session || session.role !== "AGGREGATOR") {
+    throw new Error("Akses ditolak");
   }
 
-  const name = formData.get('name') as string
-  const location = formData.get('location') as string
-  const capacity = parseInt(formData.get('capacity') as string, 10)
-  const approverId = formData.get('approverId') ? parseInt(formData.get('approverId') as string, 10) : undefined
-  const facilityIds = formData.getAll('facilities').map(id => parseInt(id as string, 10))
+  const name = formData.get("name") as string;
+  const location = formData.get("location") as string;
+  const capacity = parseInt(formData.get("capacity") as string, 10);
+  const approverId = formData.get("approverId")
+    ? parseInt(formData.get("approverId") as string, 10)
+    : undefined;
+  const facilityIds = formData
+    .getAll("facilities")
+    .map((id) => parseInt(id as string, 10));
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const room = await tx.room.create({
       data: {
         name,
@@ -24,35 +29,39 @@ export async function createRoom(formData: FormData) {
         capacity,
         approverId,
       },
-    })
+    });
 
     if (facilityIds.length > 0) {
       await tx.roomFacility.createMany({
-        data: facilityIds.map(fId => ({
+        data: facilityIds.map((fId) => ({
           roomId: room.id,
           facilityId: fId,
-        }))
-      })
+        })),
+      });
     }
-  })
+  });
 
-  revalidatePath('/admin/rooms')
+  revalidatePath("/admin/rooms");
 }
 
 export async function updateRoom(formData: FormData) {
-  const session = await verifySession()
-  if (!session || session.role !== 'AGGREGATOR') {
-    throw new Error('Akses ditolak')
+  const session = await verifySession();
+  if (!session || session.role !== "AGGREGATOR") {
+    throw new Error("Akses ditolak");
   }
 
-  const id = parseInt(formData.get('id') as string, 10)
-  const name = formData.get('name') as string
-  const location = formData.get('location') as string
-  const capacity = parseInt(formData.get('capacity') as string, 10)
-  const approverId = formData.get('approverId') ? parseInt(formData.get('approverId') as string, 10) : undefined
-  const facilityIds = formData.getAll('facilities').map(id => parseInt(id as string, 10))
+  const id = parseInt(formData.get("id") as string, 10);
+  const name = formData.get("name") as string;
+  const location = formData.get("location") as string;
+  const capacity = parseInt(formData.get("capacity") as string, 10);
+  const approverId = formData.get("approverId")
+    ? parseInt(formData.get("approverId") as string, 10)
+    : undefined;
+  const facilityIds = formData
+    .getAll("facilities")
+    .map((id) => parseInt(id as string, 10));
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.room.update({
       where: { id },
       data: {
@@ -61,35 +70,35 @@ export async function updateRoom(formData: FormData) {
         capacity,
         approverId,
       },
-    })
+    });
 
     // Sync facilities: delete all and re-create
     await tx.roomFacility.deleteMany({
-      where: { roomId: id }
-    })
+      where: { roomId: id },
+    });
 
     if (facilityIds.length > 0) {
       await tx.roomFacility.createMany({
-        data: facilityIds.map(fId => ({
+        data: facilityIds.map((fId) => ({
           roomId: id,
           facilityId: fId,
-        }))
-      })
+        })),
+      });
     }
-  })
+  });
 
-  revalidatePath('/admin/rooms')
+  revalidatePath("/admin/rooms");
 }
 
 export async function deleteRoom(id: number) {
-  const session = await verifySession()
-  if (!session || session.role !== 'AGGREGATOR') {
-    throw new Error('Akses ditolak')
+  const session = await verifySession();
+  if (!session || session.role !== "AGGREGATOR") {
+    throw new Error("Akses ditolak");
   }
 
   await prisma.room.delete({
     where: { id },
-  })
+  });
 
-  revalidatePath('/admin/rooms')
+  revalidatePath("/admin/rooms");
 }

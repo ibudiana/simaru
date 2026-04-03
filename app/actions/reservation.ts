@@ -17,9 +17,9 @@ const STAGE_STATUS = {
 } as const;
 
 export async function submitReservation(
-  prevState: { error?: string } | undefined,
+  state: { error: string } | null,
   formData: FormData,
-) {
+): Promise<{ error: string } | null> {
   const session = await verifySession();
   if (!session || session.role !== "REQUESTOR") {
     return { error: "Tidak memiliki izin akses" };
