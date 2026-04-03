@@ -1,5 +1,4 @@
 import prisma from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { verifySession } from "@/lib/session";
 import {
   Card,
@@ -20,20 +19,6 @@ import { redirect } from "next/navigation";
 import { processAdminApproval } from "@/app/actions/admin";
 import { StatsCard } from "@/components/StatsCard";
 import { ApprovalActionForm } from "@/components/ApprovalActionForm";
-
-type PendingApprovalStage = Prisma.ApprovalWorkflowGetPayload<{
-  include: {
-    reservation: {
-      include: {
-        user: true;
-        room: {
-          include: { approver: true };
-        };
-        schedule: true;
-      };
-    };
-  };
-}>;
 
 export default async function AdminReservations() {
   const session = await verifySession();
@@ -144,123 +129,125 @@ export default async function AdminReservations() {
           </Card>
         ) : (
           <div className="grid gap-8">
-            {pendingApprovals.map((stage: PendingApprovalStage) => {
-              const res = stage.reservation;
-              return (
-                <Card
-                  key={stage.id}
-                  className="overflow-hidden border-none shadow-sm hover:shadow-lg transition-all duration-300 bg-white rounded-2xl group"
-                >
-                  <div className="h-2 w-full bg-yellow-400 group-hover:bg-yellow-500 transition-colors" />
-                  <CardHeader className="flex flex-row items-center justify-between pb-4 bg-zinc-50/30">
-                    <div className="flex items-center space-x-4">
-                      <div className="h-12 w-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-primary border border-zinc-100">
-                        <Building className="h-6 w-6" />
+            {pendingApprovals.map(
+              (stage: (typeof pendingApprovals)[number]) => {
+                const res = stage.reservation;
+                return (
+                  <Card
+                    key={stage.id}
+                    className="overflow-hidden border-none shadow-sm hover:shadow-lg transition-all duration-300 bg-white rounded-2xl group"
+                  >
+                    <div className="h-2 w-full bg-yellow-400 group-hover:bg-yellow-500 transition-colors" />
+                    <CardHeader className="flex flex-row items-center justify-between pb-4 bg-zinc-50/30">
+                      <div className="flex items-center space-x-4">
+                        <div className="h-12 w-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-primary border border-zinc-100">
+                          <Building className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-xl font-bold">
+                            {res.room.name}
+                          </CardTitle>
+                          <CardDescription className="flex items-center mt-1">
+                            <MapPin className="h-3 w-3 mr-1 text-primary" />
+                            {res.room.location}
+                          </CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-xl font-bold">
-                          {res.room.name}
-                        </CardTitle>
-                        <CardDescription className="flex items-center mt-1">
-                          <MapPin className="h-3 w-3 mr-1 text-primary" />
-                          {res.room.location}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className="text-yellow-600 border-yellow-500 bg-yellow-50 font-bold px-3 py-1"
-                    >
-                      Verifikasi Lapangan
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="pt-6 pb-2">
-                    <div className="grid lg:grid-cols-2 gap-10">
-                      <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
-                          <div className="flex items-start">
-                            <div className="h-8 w-8 bg-zinc-100 rounded-lg flex items-center justify-center mr-3 shrink-0">
-                              <UserIcon className="h-4 w-4 text-zinc-500" />
+                      <Badge
+                        variant="outline"
+                        className="text-yellow-600 border-yellow-500 bg-yellow-50 font-bold px-3 py-1"
+                      >
+                        Verifikasi Lapangan
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="pt-6 pb-2">
+                      <div className="grid lg:grid-cols-2 gap-10">
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="flex items-start">
+                              <div className="h-8 w-8 bg-zinc-100 rounded-lg flex items-center justify-center mr-3 shrink-0">
+                                <UserIcon className="h-4 w-4 text-zinc-500" />
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                                  Pemohon
+                                </span>
+                                <span className="text-sm font-semibold block mt-0.5">
+                                  {res.user.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground block">
+                                  {res.user.organization || "-"}
+                                </span>
+                              </div>
                             </div>
-                            <div>
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                                Pemohon
-                              </span>
-                              <span className="text-sm font-semibold block mt-0.5">
-                                {res.user.name}
-                              </span>
-                              <span className="text-xs text-muted-foreground block">
-                                {res.user.organization || "-"}
-                              </span>
+
+                            <div className="flex items-start">
+                              <div className="h-8 w-8 bg-zinc-100 rounded-lg flex items-center justify-center mr-3 shrink-0">
+                                <CalendarIcon className="h-4 w-4 text-zinc-500" />
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                                  Waktu Penggunaan
+                                </span>
+                                <span className="text-sm font-semibold block mt-0.5">
+                                  {formatDate(new Date(res.schedule.startTime))}
+                                </span>
+                                <span className="text-xs text-muted-foreground block">
+                                  {formatTime(new Date(res.schedule.startTime))}{" "}
+                                  - {formatTime(new Date(res.schedule.endTime))}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex items-start">
-                            <div className="h-8 w-8 bg-zinc-100 rounded-lg flex items-center justify-center mr-3 shrink-0">
-                              <CalendarIcon className="h-4 w-4 text-zinc-500" />
+                          {res.room.approver && (
+                            <div className="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50 flex items-center justify-between">
+                              <div>
+                                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block">
+                                  Target Approver Final
+                                </span>
+                                <span className="text-sm font-semibold text-blue-900 mt-1 block">
+                                  {res.room.approver.name}
+                                </span>
+                                <span className="text-[10px] text-blue-500 font-medium">
+                                  Kaprodi / Pimpinan Unit
+                                </span>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className="bg-white text-blue-600 border-blue-200"
+                              >
+                                Terjadwal Otomatis
+                              </Badge>
                             </div>
-                            <div>
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                                Waktu Penggunaan
-                              </span>
-                              <span className="text-sm font-semibold block mt-0.5">
-                                {formatDate(new Date(res.schedule.startTime))}
-                              </span>
-                              <span className="text-xs text-muted-foreground block">
-                                {formatTime(new Date(res.schedule.startTime))} -{" "}
-                                {formatTime(new Date(res.schedule.endTime))}
-                              </span>
-                            </div>
+                          )}
+
+                          <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-2">
+                              Tujuan Penggunaan
+                            </span>
+                            <p className="text-sm text-zinc-700 leading-relaxed font-medium">
+                              &quot;{res.purpose}&quot;
+                            </p>
                           </div>
                         </div>
 
-                        {res.room.approver && (
-                          <div className="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50 flex items-center justify-between">
-                            <div>
-                              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block">
-                                Target Approver Final
-                              </span>
-                              <span className="text-sm font-semibold text-blue-900 mt-1 block">
-                                {res.room.approver.name}
-                              </span>
-                              <span className="text-[10px] text-blue-500 font-medium">
-                                Kaprodi / Pimpinan Unit
-                              </span>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className="bg-white text-blue-600 border-blue-200"
-                            >
-                              Terjadwal Otomatis
-                            </Badge>
-                          </div>
-                        )}
-
-                        <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-2">
-                            Tujuan Penggunaan
-                          </span>
-                          <p className="text-sm text-zinc-700 leading-relaxed font-medium">
-                            &quot;{res.purpose}&quot;
-                          </p>
+                        <div className="flex flex-col h-full">
+                          <ApprovalActionForm
+                            reservationId={res.id}
+                            stageId={stage.id}
+                            actionFn={processAdminApproval}
+                            rejectLabel="Tolak"
+                            approveLabel="Verifikasi & Teruskan"
+                          />
                         </div>
                       </div>
-
-                      <div className="flex flex-col h-full">
-                        <ApprovalActionForm
-                          reservationId={res.id}
-                          stageId={stage.id}
-                          actionFn={processAdminApproval}
-                          rejectLabel="Tolak"
-                          approveLabel="Verifikasi & Teruskan"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                  <div className="h-1 bg-zinc-50/50" />
-                </Card>
-              );
-            })}
+                    </CardContent>
+                    <div className="h-1 bg-zinc-50/50" />
+                  </Card>
+                );
+              },
+            )}
           </div>
         )}
       </div>
