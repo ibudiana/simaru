@@ -56,8 +56,8 @@ type Room = {
   name: string;
   location: string;
   capacity: number;
-  approverId?: number;
-  approver?: { id: number; name: string };
+  approverId: number | null;
+  approver?: { name: string } | null;
   facilities?: Facility[];
 };
 

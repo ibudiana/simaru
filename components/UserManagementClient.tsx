@@ -58,8 +58,8 @@ type User = {
   name: string;
   email: string;
   role: "SUPER_ADMIN" | "AGGREGATOR" | "REQUESTOR" | "APPROVER";
-  organization?: string;
-  phone?: string;
+  organization: string | null;
+  phone: string | null;
 };
 
 export function UserManagementClient({

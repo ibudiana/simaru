@@ -21,6 +21,19 @@ const StageStatus = {
 
 // const prisma = new PrismaClient();
 
+type UserData = {
+  name: string;
+  email: string;
+  role: (typeof Role)[keyof typeof Role];
+  org: string;
+};
+
+type RoomData = {
+  name: string;
+  loc: string;
+  cap: number;
+};
+
 async function main() {
   console.log("Starting massive seeding...");
 
@@ -116,7 +129,7 @@ async function main() {
   ];
 
   const createdUsers = await Promise.all(
-    usersData.map((u) =>
+    usersData.map((u: UserData) =>
       prisma.user.create({
         data: {
           name: u.name,
@@ -148,7 +161,7 @@ async function main() {
   ];
 
   const createdRooms = await Promise.all(
-    roomData.map((r) => {
+    roomData.map((r: RoomData) => {
       const randomApprover =
         approvers[Math.floor(Math.random() * approvers.length)];
       return prisma.room.create({
@@ -160,7 +173,7 @@ async function main() {
           facilities: {
             create: facilities
               .slice(0, Math.floor(Math.random() * 5) + 1)
-              .map((f) => ({
+              .map((f: (typeof facilities)[number]) => ({
                 facilityId: f.id,
               })),
           },
