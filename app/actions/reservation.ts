@@ -1,25 +1,15 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { ReservationStatus, StageStatus } from "../generated/prisma/client";
 import { verifySession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-const RESERVATION_STATUS = {
-  PENDING: "PENDING",
-  APPROVED: "APPROVED",
-  REJECTED: "REJECTED",
-} as const;
-
-const STAGE_STATUS = {
-  REQUESTED: "REQUESTED",
-  APPROVED: "APPROVED",
-} as const;
-
 export async function submitReservation(
-  state: { error: string } | null,
+  _prevState: { error: string } | null,
   formData: FormData,
-): Promise<{ error: string } | null> {
+) {
   const session = await verifySession();
   if (!session || session.role !== "REQUESTOR") {
     return { error: "Tidak memiliki izin akses" };
@@ -98,13 +88,13 @@ export async function submitReservation(
         userId: session.userId,
         roomId,
         scheduleId: schedule.id,
-        status: RESERVATION_STATUS.PENDING,
+        status: ReservationStatus.PENDING,
         purpose,
         approvalStages: {
           create: {
-            stage: STAGE_STATUS.REQUESTED,
+            stage: StageStatus.REQUESTED,
             approverId: assignedAdminId,
-            status: RESERVATION_STATUS.PENDING,
+            status: ReservationStatus.PENDING,
             notes: "Menunggu ditinjau Admin",
           },
         },

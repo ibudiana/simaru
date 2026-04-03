@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import {
   Card,
@@ -18,8 +18,6 @@ import {
 import { redirect } from "next/navigation";
 import { processKaprodiApproval } from "@/app/actions/approver";
 import { ApprovalActionForm } from "@/components/ApprovalActionForm";
-
-const prisma = new PrismaClient();
 
 export default async function ApproverReservations() {
   const session = await verifySession();
@@ -83,7 +81,7 @@ export default async function ApproverReservations() {
         </Card>
       ) : (
         <div className="grid gap-6">
-          {pendingApprovals.map((stage: (typeof pendingApprovals)[number]) => {
+          {pendingApprovals.map((stage) => {
             const res = stage.reservation;
             return (
               <Card

@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { ReservationStatus, StageStatus } from "../generated/prisma/client";
 import { verifySession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import {
@@ -14,16 +15,6 @@ import {
   endOfYear,
   parseISO,
 } from "date-fns";
-
-const RESERVATION_STATUS = {
-  PENDING: "PENDING",
-  APPROVED: "APPROVED",
-  REJECTED: "REJECTED",
-} as const;
-
-const STAGE_STATUS = {
-  APPROVED: "APPROVED",
-} as const;
 
 export async function processAdminApproval(formData: FormData) {
   const session = await verifySession();
@@ -47,9 +38,8 @@ export async function processAdminApproval(formData: FormData) {
 
   // Update the stage belonging to this Admin
   const adminStage = reservation.approvalStages.find(
-    (s: (typeof reservation.approvalStages)[number]) =>
-      s.approverId === session.userId &&
-      s.status === RESERVATION_STATUS.PENDING,
+    (s) =>
+      s.approverId === session.userId && s.status === ReservationStatus.PENDING,
   );
 
   if (!adminStage) throw new Error("Tidak ada tugas persetujuan untuk Anda");
@@ -59,14 +49,14 @@ export async function processAdminApproval(formData: FormData) {
       prisma.approvalWorkflow.update({
         where: { id: adminStage.id },
         data: {
-          status: RESERVATION_STATUS.REJECTED,
+          status: ReservationStatus.REJECTED,
           notes,
           approvedAt: new Date(),
         },
       }),
       prisma.reservation.update({
         where: { id: reservationId },
-        data: { status: RESERVATION_STATUS.REJECTED },
+        data: { status: ReservationStatus.REJECTED },
       }),
       prisma.notification.create({
         data: {
@@ -79,7 +69,6 @@ export async function processAdminApproval(formData: FormData) {
   } else if (action === "APPROVE") {
     // Admin approves -> forward to the specific room approver (Kaprodi)
     const targetApproverId = reservation.room.approverId;
-    let finalApproverId: number;
 
     if (!targetApproverId) {
       // Fallback to first approver if none specifically assigned (though it should be assigned)
@@ -89,85 +78,160 @@ export async function processAdminApproval(formData: FormData) {
       if (approvers.length === 0) {
         throw new Error("Tidak ada Kaprodi di dalam sistem.");
       }
-      finalApproverId = approvers[0].id;
+      const finalApproverId = approvers[0].id;
+      await prisma.$transaction([
+        prisma.approvalWorkflow.update({
+          where: { id: adminStage.id },
+          data: {
+            status: ReservationStatus.APPROVED,
+            notes,
+            approvedAt: new Date(),
+          },
+        }),
+        // Create next stage
+        prisma.approvalWorkflow.create({
+          data: {
+            reservationId,
+            stage: StageStatus.APPROVED, // next stage after REQUESTED
+            approverId: finalApproverId,
+            status: ReservationStatus.PENDING,
+            notes: "Menunggu persetujuan final dari Kaprodi / Pimpinan",
+          },
+        }),
+        prisma.notification.create({
+          data: {
+            userId: reservation.userId,
+            message: `Reservasi Anda sedang diteruskan ke Kaprodi untuk persetujuan akhir.`,
+            link: "/requester/reservations",
+          },
+        }),
+        prisma.notification.create({
+          data: {
+            userId: finalApproverId,
+            message: `Sebuah reservasi baru (#${reservationId}) telah diverifikasi Admin dan menunggu persetujuan Anda.`,
+            link: "/approver",
+          },
+        }),
+      ]);
+
+      // --- Send Emails ---
+      const requester = await prisma.user.findUnique({
+        where: { id: reservation.userId },
+        select: { email: true, name: true },
+      });
+      const finalApprover = await prisma.user.findUnique({
+        where: { id: finalApproverId },
+        select: { email: true, name: true },
+      });
+      const { sendEmail, getEmailTemplate } = await import("@/lib/mail");
+
+      if (requester?.email) {
+        sendEmail({
+          to: requester.email,
+          subject: "Progress Reservasi SIMARU: Diverifikasi Admin",
+          html: getEmailTemplate(
+            "Reservasi Diverifikasi",
+            `Halo ${requester.name}, reservasi Anda (#${reservationId}) telah diverifikasi oleh Admin dan kini diteruskan ke Kaprodi untuk persetujuan akhir.`,
+            "/requester/reservations",
+            "Cek Status",
+          ),
+        }).catch((err) =>
+          console.error("Background Email Error (Requester):", err),
+        );
+      }
+
+      if (finalApprover?.email) {
+        sendEmail({
+          to: finalApprover.email,
+          subject: "Menunggu Persetujuan Final - SIMARU",
+          html: getEmailTemplate(
+            "Persetujuan Final Diperlukan",
+            `Halo ${finalApprover.name}, sebuah reservasi (#${reservationId}) telah diverifikasi Admin dan memerlukan persetujuan akhir dari Anda.`,
+            "/approver",
+            "Review Reservasi",
+          ),
+        }).catch((err) =>
+          console.error("Background Email Error (Approver):", err),
+        );
+      }
     } else {
-      finalApproverId = targetApproverId;
-    }
+      const finalApproverId = targetApproverId;
 
-    await prisma.$transaction([
-      prisma.approvalWorkflow.update({
-        where: { id: adminStage.id },
-        data: {
-          status: RESERVATION_STATUS.APPROVED,
-          notes,
-          approvedAt: new Date(),
-        },
-      }),
-      // Create next stage
-      prisma.approvalWorkflow.create({
-        data: {
-          reservationId,
-          stage: STAGE_STATUS.APPROVED, // next stage after REQUESTED
-          approverId: finalApproverId,
-          status: RESERVATION_STATUS.PENDING,
-          notes: "Menunggu persetujuan final dari Kaprodi / Pimpinan",
-        },
-      }),
-      prisma.notification.create({
-        data: {
-          userId: reservation.userId,
-          message: `Reservasi Anda sedang diteruskan ke Kaprodi untuk persetujuan akhir.`,
-          link: "/requester/reservations",
-        },
-      }),
-      prisma.notification.create({
-        data: {
-          userId: finalApproverId,
-          message: `Sebuah reservasi baru (#${reservationId}) telah diverifikasi Admin dan menunggu persetujuan Anda.`,
-          link: "/approver",
-        },
-      }),
-    ]);
+      await prisma.$transaction([
+        prisma.approvalWorkflow.update({
+          where: { id: adminStage.id },
+          data: {
+            status: ReservationStatus.APPROVED,
+            notes,
+            approvedAt: new Date(),
+          },
+        }),
+        // Create next stage
+        prisma.approvalWorkflow.create({
+          data: {
+            reservationId,
+            stage: StageStatus.APPROVED, // next stage after REQUESTED
+            approverId: finalApproverId,
+            status: ReservationStatus.PENDING,
+            notes: "Menunggu persetujuan final dari Kaprodi / Pimpinan",
+          },
+        }),
+        prisma.notification.create({
+          data: {
+            userId: reservation.userId,
+            message: `Reservasi Anda sedang diteruskan ke Kaprodi untuk persetujuan akhir.`,
+            link: "/requester/reservations",
+          },
+        }),
+        prisma.notification.create({
+          data: {
+            userId: finalApproverId,
+            message: `Sebuah reservasi baru (#${reservationId}) telah diverifikasi Admin dan menunggu persetujuan Anda.`,
+            link: "/approver",
+          },
+        }),
+      ]);
 
-    // --- Send Emails ---
-    const requester = await prisma.user.findUnique({
-      where: { id: reservation.userId },
-      select: { email: true, name: true },
-    });
-    const finalApprover = await prisma.user.findUnique({
-      where: { id: finalApproverId },
-      select: { email: true, name: true },
-    });
-    const { sendEmail, getEmailTemplate } = await import("@/lib/mail");
+      // --- Send Emails ---
+      const requester = await prisma.user.findUnique({
+        where: { id: reservation.userId },
+        select: { email: true, name: true },
+      });
+      const finalApprover = await prisma.user.findUnique({
+        where: { id: finalApproverId },
+        select: { email: true, name: true },
+      });
+      const { sendEmail, getEmailTemplate } = await import("@/lib/mail");
 
-    if (requester?.email) {
-      sendEmail({
-        to: requester.email,
-        subject: "Progress Reservasi SIMARU: Diverifikasi Admin",
-        html: getEmailTemplate(
-          "Reservasi Diverifikasi",
-          `Halo ${requester.name}, reservasi Anda (#${reservationId}) telah diverifikasi oleh Admin dan kini diteruskan ke Kaprodi untuk persetujuan akhir.`,
-          "/requester/reservations",
-          "Cek Status",
-        ),
-      }).catch((err) =>
-        console.error("Background Email Error (Requester):", err),
-      );
-    }
+      if (requester?.email) {
+        sendEmail({
+          to: requester.email,
+          subject: "Progress Reservasi SIMARU: Diverifikasi Admin",
+          html: getEmailTemplate(
+            "Reservasi Diverifikasi",
+            `Halo ${requester.name}, reservasi Anda (#${reservationId}) telah diverifikasi oleh Admin dan kini diteruskan ke Kaprodi untuk persetujuan akhir.`,
+            "/requester/reservations",
+            "Cek Status",
+          ),
+        }).catch((err) =>
+          console.error("Background Email Error (Requester):", err),
+        );
+      }
 
-    if (finalApprover?.email) {
-      sendEmail({
-        to: finalApprover.email,
-        subject: "Menunggu Persetujuan Final - SIMARU",
-        html: getEmailTemplate(
-          "Persetujuan Final Diperlukan",
-          `Halo ${finalApprover.name}, sebuah reservasi (#${reservationId}) telah diverifikasi Admin dan memerlukan persetujuan akhir dari Anda.`,
-          "/approver",
-          "Review Reservasi",
-        ),
-      }).catch((err) =>
-        console.error("Background Email Error (Approver):", err),
-      );
+      if (finalApprover?.email) {
+        sendEmail({
+          to: finalApprover.email,
+          subject: "Menunggu Persetujuan Final - SIMARU",
+          html: getEmailTemplate(
+            "Persetujuan Final Diperlukan",
+            `Halo ${finalApprover.name}, sebuah reservasi (#${reservationId}) telah diverifikasi Admin dan memerlukan persetujuan akhir dari Anda.`,
+            "/approver",
+            "Review Reservasi",
+          ),
+        }).catch((err) =>
+          console.error("Background Email Error (Approver):", err),
+        );
+      }
     }
   } else if (action === "REJECT") {
     // If rejected, also send email to requester
@@ -277,7 +341,7 @@ export async function getReportData(filter: {
     orderBy: { schedule: { startTime: "desc" } },
   });
 
-  return reservations.map((r: (typeof reservations)[number]) => ({
+  return reservations.map((r) => ({
     "ID Reservasi": r.id,
     "Nama Pemohon": r.user.name,
     Email: r.user.email,

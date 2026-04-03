@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import {
   Card,
@@ -21,12 +21,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SuccessToast } from "@/components/SuccessToast";
 import { Suspense } from "react";
-
-const prisma = new PrismaClient();
-
-interface PageProps {
-  searchParams: Promise<{ success?: string }>;
-}
 
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
@@ -61,13 +55,9 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
-export default async function RequesterReservations({
-  searchParams,
-}: PageProps) {
+export default async function RequesterReservations() {
   const session = await verifySession();
   if (!session?.userId) redirect("/login");
-
-  await searchParams;
 
   const reservations = await prisma.reservation.findMany({
     where: { userId: session.userId },
@@ -130,7 +120,7 @@ export default async function RequesterReservations({
         </Card>
       ) : (
         <div className="grid gap-6">
-          {reservations.map((res: (typeof reservations)[number]) => (
+          {reservations.map((res) => (
             <Card key={res.id} className="overflow-hidden">
               <div
                 className={`h-2 w-full ${res.status === "APPROVED" ? "bg-green-500" : res.status === "REJECTED" ? "bg-red-500" : "bg-yellow-500"}`}
@@ -176,37 +166,35 @@ export default async function RequesterReservations({
                       Proses Peninjauan
                     </span>
                     <ul className="space-y-3 mt-3">
-                      {res.approvalStages.map(
-                        (stage: (typeof res.approvalStages)[number]) => (
-                          <li key={stage.id} className="flex relative">
-                            <div
-                              className={`mt-0.5 w-2 h-2 rounded-full mr-3 shrink-0 ${
-                                stage.status === "APPROVED"
-                                  ? "bg-green-500"
-                                  : stage.status === "REJECTED"
-                                    ? "bg-red-500"
-                                    : "bg-yellow-500 animate-pulse"
-                              }`}
-                            />
-                            <div>
-                              <p className="font-medium text-xs text-muted-foreground uppercase">
-                                {stage.stage}
+                      {res.approvalStages.map((stage) => (
+                        <li key={stage.id} className="flex relative">
+                          <div
+                            className={`mt-0.5 w-2 h-2 rounded-full mr-3 shrink-0 ${
+                              stage.status === "APPROVED"
+                                ? "bg-green-500"
+                                : stage.status === "REJECTED"
+                                  ? "bg-red-500"
+                                  : "bg-yellow-500 animate-pulse"
+                            }`}
+                          />
+                          <div>
+                            <p className="font-medium text-xs text-muted-foreground uppercase">
+                              {stage.stage}
+                            </p>
+                            <p className="font-medium">
+                              {stage.approver.name} ({stage.approver.role})
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Status: {stage.status}
+                            </p>
+                            {stage.notes && (
+                              <p className="text-xs italic mt-1 bg-yellow-100 p-1.5 rounded-md leading-relaxed text-yellow-800">
+                                {stage.notes}
                               </p>
-                              <p className="font-medium">
-                                {stage.approver.name} ({stage.approver.role})
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Status: {stage.status}
-                              </p>
-                              {stage.notes && (
-                                <p className="text-xs italic mt-1 bg-yellow-100 p-1.5 rounded-md leading-relaxed text-yellow-800">
-                                  &quot;{stage.notes}&quot;
-                                </p>
-                              )}
-                            </div>
-                          </li>
-                        ),
-                      )}
+                            )}
+                          </div>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </div>

@@ -1,11 +1,10 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { Role } from "../generated/prisma/client";
 import { verifySession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-
-type Role = "AGGREGATOR" | "REQUESTOR" | "APPROVER";
 
 export async function createUser(formData: FormData) {
   const session = await verifySession();

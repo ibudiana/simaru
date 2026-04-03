@@ -42,3 +42,4 @@ next-env.d.ts
 
 # Ignore Prisma client generated output
 /prisma/generated
+backup

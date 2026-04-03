@@ -1,14 +1,9 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { ReservationStatus } from "../generated/prisma/client";
 import { verifySession } from "@/lib/session";
 import { revalidatePath } from "next/cache";
-
-const RESERVATION_STATUS = {
-  PENDING: "PENDING",
-  APPROVED: "APPROVED",
-  REJECTED: "REJECTED",
-} as const;
 
 export async function processKaprodiApproval(formData: FormData) {
   const session = await verifySession();
@@ -29,9 +24,8 @@ export async function processKaprodiApproval(formData: FormData) {
 
   // Update the stage belonging to this Kaprodi
   const kaprodiStage = reservation.approvalStages.find(
-    (s: (typeof reservation.approvalStages)[number]) =>
-      s.approverId === session.userId &&
-      s.status === RESERVATION_STATUS.PENDING,
+    (s) =>
+      s.approverId === session.userId && s.status === ReservationStatus.PENDING,
   );
 
   if (!kaprodiStage) throw new Error("Tidak ada tugas persetujuan untuk Anda");
@@ -41,14 +35,14 @@ export async function processKaprodiApproval(formData: FormData) {
       prisma.approvalWorkflow.update({
         where: { id: kaprodiStage.id },
         data: {
-          status: RESERVATION_STATUS.REJECTED,
+          status: ReservationStatus.REJECTED,
           notes,
           approvedAt: new Date(),
         },
       }),
       prisma.reservation.update({
         where: { id: reservationId },
-        data: { status: RESERVATION_STATUS.REJECTED },
+        data: { status: ReservationStatus.REJECTED },
       }),
       prisma.notification.create({
         data: {
@@ -64,7 +58,7 @@ export async function processKaprodiApproval(formData: FormData) {
       prisma.approvalWorkflow.update({
         where: { id: kaprodiStage.id },
         data: {
-          status: RESERVATION_STATUS.APPROVED,
+          status: ReservationStatus.APPROVED,
           notes,
           approvedAt: new Date(),
         },
@@ -72,7 +66,7 @@ export async function processKaprodiApproval(formData: FormData) {
       // Finalize the overall reservation
       prisma.reservation.update({
         where: { id: reservationId },
-        data: { status: RESERVATION_STATUS.APPROVED },
+        data: { status: ReservationStatus.APPROVED },
       }),
       // Lock the schedule finally!
       prisma.schedule.update({
