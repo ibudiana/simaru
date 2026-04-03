@@ -29,7 +29,7 @@ export async function processKaprodiApproval(formData: FormData) {
 
   // Update the stage belonging to this Kaprodi
   const kaprodiStage = reservation.approvalStages.find(
-    (s) =>
+    (s: (typeof reservation.approvalStages)[number]) =>
       s.approverId === session.userId &&
       s.status === RESERVATION_STATUS.PENDING,
   );
